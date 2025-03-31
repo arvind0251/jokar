@@ -3,7 +3,7 @@ import re
 import threading
 import time
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from textblob import TextBlob
 
 # ======= RANDOM RESPONSES ======= #
@@ -66,19 +66,19 @@ def get_smart_response(message):
             return "Yeh toh ajeeb baat hai! Suno ek weird fact: " + random.choice(weird_facts)
 
 # ======= IDLE CHECK FUNCTION ======= #
-def check_idle(updater: Updater):
+async def check_idle(app: Application):
     while True:
-        time.sleep(600)  # 10 minutes
+        await asyncio.sleep(600)  # 10 minutes
         for chat_id, last_time in list(last_activity.items()):
             if time.time() - last_time >= 600:
-                updater.bot.send_message(chat_id, "10 minute ho gaye, sab chup kyun hain? Suno ek mazedaar baat: " + random.choice(jokes))
+                await app.bot.send_message(chat_id, "10 minute ho gaye, sab chup kyun hain? Suno ek mazedaar baat: " + random.choice(jokes))
                 last_activity[chat_id] = time.time()
 
 # ======= BOT FUNCTIONS ======= #
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text("Ajeeb Bot Online hai! Mujhe koi bhi message bhejo aur main kuch ajeeb bataunga! 😜")
+async def start(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text("Ajeeb Bot Online hai! Mujhe koi bhi message bhejo aur main kuch ajeeb bataunga! 😜")
 
-def respond(update: Update, context: CallbackContext) -> None:
+async def respond(update: Update, context: CallbackContext) -> None:
     user_message = update.message.text
     chat_id = update.message.chat_id
     
@@ -86,24 +86,23 @@ def respond(update: Update, context: CallbackContext) -> None:
     last_activity[chat_id] = time.time()
     
     reply = get_smart_response(user_message)
-    update.message.reply_text(reply)
+    await update.message.reply_text(reply)
 
 # ======= MAIN BOT CODE ======= #
 TOKEN = "7810505308:AAGr-fIzBSy-WXYuCZlH-fvGbCdDhRtuRLI"
 
 def main():
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+    app = Application.builder().token(TOKEN).build()
     
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, respond))
-    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, respond))
+
     # Start idle checker thread
-    idle_thread = threading.Thread(target=check_idle, args=(updater,), daemon=True)
-    idle_thread.start()
-    
-    updater.start_polling()
-    updater.idle()
+    loop = asyncio.get_event_loop()
+    loop.create_task(check_idle(app))
+
+    app.run_polling()
 
 if __name__ == "__main__":
+    import asyncio
     main()
